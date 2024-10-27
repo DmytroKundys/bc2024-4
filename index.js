@@ -2,9 +2,9 @@ const http = require('http');
 const fs = require('fs').promises;
 const { Command } = require('commander');
 const path = require('path');
+const superagent = require('superagent');
 const program = new Command();
 
-// Налаштування командного рядка
 program
     .requiredOption('-h, --host <host>', 'Адреса сервера')
     .requiredOption('-p, --port <port>', 'Порт сервера')
@@ -14,12 +14,11 @@ program.parse(process.argv);
 
 const { host, port, cache } = program.opts();
 
-// Створення сервера
 const server = http.createServer();
 
 server.on('request', async (req, res) => {
-    const code = req.url.slice(1);
-    const filePath = path.join(cache, `${code}.jpg`);
+    const code = req.url.slice(1); 
+    const filePath = path.join(cache, `${code}.jpg`); 
 
     if (req.method === 'GET') {
         try {
@@ -27,8 +26,15 @@ server.on('request', async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'image/jpeg' });
             res.end(file);
         } catch {
-            res.writeHead(404, { 'Content-Type': 'text/plain' });
-            res.end('Not Found');
+            try {
+                const response = await superagent.get(`https://http.cat/${code}`);
+                await fs.writeFile(filePath, response.body);
+                res.writeHead(200, { 'Content-Type': 'image/jpeg' });
+                res.end(response.body);
+            } catch {
+                res.writeHead(404, { 'Content-Type': 'text/plain' });
+                res.end('Not Found');
+            }
         }
     } else if (req.method === 'PUT') {
         const data = [];
@@ -53,7 +59,6 @@ server.on('request', async (req, res) => {
     }
 });
 
-// Запуск сервера
 server.listen(port, host, () => {
     console.log(`Server running on ${host}:${port}`);
 });
